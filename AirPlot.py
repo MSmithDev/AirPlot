@@ -158,7 +158,7 @@ accelXRange = [-10,0]
 magXRange = [-10,0]
 
 # Set Y range
-gyroYRange = [-10,10] #Min Max Degrees per second
+gyroYRange = [-120,120] #Min Max Degrees per second
 accelYRange = [-2,2] #Min Max G's
 magYRange = [-10,10] #Min Max Gauss
 
