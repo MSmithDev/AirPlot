@@ -4,14 +4,8 @@ import numpy as np
 
 import pyqtgraph as pg
 
-#### Configure Data sources ####
-
-## Air data will be drawn grey
+## Configure Data sources
 def getGyroX():
-    return np.random.normal()
-
-## Reference data will be drawn red
-def getRefGyroX():
     return np.random.normal()
 
 def getGyroY():
@@ -43,42 +37,56 @@ def create_plot(window, title, source, ref_source=None, row=None, colspan=2):
     plot.setLabel('bottom', 'Time', 's')
     plot.setXRange(-10, 0)
     plot.addLegend()
-
-    data = np.empty((chunkSize, 2))
-    data[:, 0] = np.linspace(-10, 0, chunkSize)
-    data[:, 1] = np.nan
-    
-    ref_data = np.empty((chunkSize, 2)) if ref_source else None
-    if ref_data is not None:
-        ref_data[:, 0] = np.linspace(-10, 0, chunkSize)
-        ref_data[:, 1] = np.nan
-
+    curves = []
+    ref_curves = [] if ref_source else None
+    data = np.empty((chunkSize + 1, 2))
+    ref_data = np.empty((chunkSize + 1, 2)) if ref_source else None
     ptr = 0
 
-    main_curve = plot.plot(name="Air")
-    ref_curve = plot.plot(name="Ref", pen='r') if ref_source else None
-
     def update():
-        nonlocal data, ref_data, ptr, main_curve, ref_curve
+        nonlocal data, ref_data, ptr, curves, ref_curves
         now = perf_counter()
+        for c in curves:
+            c.setPos(-(now - startTime), 0)
+        if ref_curves:
+            for c in ref_curves:
+                c.setPos(-(now - startTime), 0)
 
-        data[:-1] = data[1:]
-        data[-1] = [now - startTime, source()]
-
-        if ref_data is not None:
-            ref_data[:-1] = ref_data[1:]
-            ref_data[-1] = [now - startTime, ref_source()]
-
-        plot.setXRange(now - startTime - 5, now - startTime)
-
-        main_curve.setData(x=data[:, 0], y=data[:, 1])
-
-        if ref_curve:
-            ref_curve.setData(x=ref_data[:, 0], y=ref_data[:, 1])
-
+        i = ptr % chunkSize
+        if i == 0:
+            curve = plot.plot(name="Data")
+            curves.append(curve)
+            if ref_source:
+                ref_curve = plot.plot(pen='r')
+                ref_curves.append(ref_curve)
+            last = data[-1]
+            data = np.empty((chunkSize + 1, 2))
+            data[0] = last
+            if ref_source:
+                last = ref_data[-1]
+                ref_data = np.empty((chunkSize + 1, 2))
+                ref_data[0] = last
+            while len(curves) > maxChunks:
+                c = curves.pop(0)
+                plot.removeItem(c)
+                if ref_curves:
+                    c = ref_curves.pop(0)
+                    plot.removeItem(c)
+        else:
+            curve = curves[-1]
+            if ref_curves:
+                ref_curve = ref_curves[-1]
+        data[i + 1, 0] = now - startTime
+        data[i + 1, 1] = source()
+        curve.setData(x=data[:i + 2, 0], y=data[:i + 2, 1])
+        if ref_curves:
+            ref_data[i + 1, 0] = now - startTime
+            ref_data[i + 1, 1] = ref_source()
+            ref_curve.setData(x=ref_data[:i + 2, 0], y=ref_data[:i + 2, 1])
         ptr += 1
 
     return update
+
 
 
 win = pg.GraphicsLayoutWidget(show=True, size=(1400, 800))
@@ -88,7 +96,7 @@ chunkSize = 100
 maxChunks = 10
 startTime = perf_counter()
 
-updateGyroX = create_plot(win, "Gyro X", getGyroX, getRefGyroX)
+updateGyroX = create_plot(win, "Gyro X", getGyroX, getMagX)
 updateAccelX = create_plot(win, "Accel X", getAccelX)
 updateMagX = create_plot(win, "Mag X", getMagX)
 
