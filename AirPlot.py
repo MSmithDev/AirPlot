@@ -1,48 +1,112 @@
 from time import perf_counter
-
+import ctypes
 import numpy as np
-
 import pyqtgraph as pg
 
+#### Configure DLL ####
+# Load the DLL
+mydll = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
+
+# Set the return type of the GetQuaternion function to a float pointer
+mydll.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
+mydll.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
+
+# Call StartConnection
+print("Attempting to connect to AirAPI_Driver...")
+connection = mydll.StartConnection()
+
+def getRawGyro():
+    # Call a function from the DLL
+    gyroPtr = mydll.GetRawGyro()
+    rawGyro = [gyroPtr[i] for i in range(3)]
+    return rawGyro
+
+def getRawAccel():
+    # Call a function from the DLL
+    AccelPtr = mydll.GetRawAccel()
+    rawAccel = [AccelPtr[i] for i in range(3)]
+    return rawAccel
+
+
 #### Configure Data sources ####
+rawGyroReading = [0,0,0]
+rawAccelReading = [0,0,0]
+##Air Data source
+def pollAirData():
+    global rawGyroReading
+    global rawAccelReading
+
+    rawGyroReading = getRawGyro()
+    rawAccelReading = getRawAccel()
+    return
+
 
 ## Air data will be drawn grey
 def getGyroX():
-    return np.random.normal()
+    return rawGyroReading[0]
 
 ## Reference data will be drawn red
 def getRefGyroX():
-    return np.random.normal()
+    return 0
 
 def getGyroY():
-    return np.random.normal()
+    return rawGyroReading[1]
+
+def getRefGyroY():
+    return 0
 
 def getGyroZ():
-    return np.random.normal()
+    return rawGyroReading[2]
+
+def getRefGyroZ():
+    return 0
 
 def getAccelX():
-    return np.random.normal()
+    return rawAccelReading[0]
+
+def getRefAccelX():
+    return 0
 
 def getAccelY():
-    return np.random.normal()
+    return rawAccelReading[1]
+
+def getRefAccelY():
+    return 0
 
 def getAccelZ():
-    return np.random.normal()
+    return rawAccelReading[2]
+
+def getRefAccelZ():
+    return 0
 
 def getMagX():
-    return np.random.normal()
+    return 0
+
+def getRefMagX():
+    return 0
 
 def getMagY():
-    return np.random.normal()
+    return 0
+
+def getRefMagY():
+    return 0
 
 def getMagZ():
-    return np.random.normal()
+    return 0
 
-def create_plot(window, title, source, ref_source=None, row=None, colspan=2):
+def getRefMagZ():
+    return 0
+
+def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, row=None, colspan=2):
     plot = window.addPlot(title=title, colspan=colspan, row=row)
     plot.setLabel('bottom', 'Time', 's')
-    plot.setXRange(-10, 0)
+    if(XRange != None):
+        plot.setXRange(XRange[0], XRange[1])
+    else:
+        plot.setXRange(-10, 0)
     plot.addLegend()
+    if(YRange != None):
+        plot.setYRange(YRange[0], YRange[1])
 
     data = np.empty((chunkSize, 2))
     data[:, 0] = np.linspace(-10, 0, chunkSize)
@@ -88,24 +152,37 @@ chunkSize = 100
 maxChunks = 10
 startTime = perf_counter()
 
-updateGyroX = create_plot(win, "Gyro X", getGyroX, getRefGyroX)
-updateAccelX = create_plot(win, "Accel X", getAccelX)
-updateMagX = create_plot(win, "Mag X", getMagX)
+# Set X range to 10 seconds
+gyroXRange = [-10,0]
+accelXRange = [-10,0]
+magXRange = [-10,0]
+
+# Set Y range
+gyroYRange = [-10,10] #Min Max Degrees per second
+accelYRange = [-2,2] #Min Max G's
+magYRange = [-10,10] #Min Max Gauss
+
+
+updateGyroX = create_plot(win, "Gyro X", getGyroX, getRefGyroX, XRange=gyroXRange, YRange=gyroYRange)
+updateAccelX = create_plot(win, "Accel X", getAccelX, getRefAccelX, XRange=accelXRange, YRange=accelYRange)
+updateMagX = create_plot(win, "Mag X", getMagX,getRefMagX, XRange=magXRange, YRange=magYRange)
 
 win.nextRow()
 
-updateGyroY = create_plot(win, "Gyro Y", getGyroY)
-updateAccelY = create_plot(win, "Accel Y", getAccelY)
-updateMagY = create_plot(win, "Mag Y", getMagY)
+updateGyroY = create_plot(win, "Gyro Y", getGyroY, getRefGyroY, XRange=gyroXRange, YRange=gyroYRange)
+updateAccelY = create_plot(win, "Accel Y", getAccelY, getRefAccelY, XRange=accelXRange, YRange=accelYRange)
+updateMagY = create_plot(win, "Mag Y", getMagY,getRefMagY, XRange=magXRange, YRange=magYRange)
 
 win.nextRow()
 
-updateGyroZ = create_plot(win, "Gyro Z", getGyroZ)
-updateAccelZ = create_plot(win, "Accel Z", getAccelZ)
-updateMagZ = create_plot(win, "Mag Z", getMagZ)
+updateGyroZ = create_plot(win, "Gyro Z", getGyroZ, getRefGyroZ, XRange=gyroXRange, YRange=gyroYRange)
+updateAccelZ = create_plot(win, "Accel Z", getAccelZ, getRefAccelZ, XRange=accelXRange, YRange=accelYRange)
+updateMagZ = create_plot(win, "Mag Z", getMagZ, getRefMagZ,XRange=magXRange, YRange=magYRange)
 
 
 def update():
+    pollAirData()
+
     updateGyroX()
     updateAccelX()
     updateMagX()
