@@ -1,34 +1,50 @@
 import ctypes
-import atexit
-from ctypes import c_float, POINTER, windll
+import time
 
-# Replace "your_dll_name.dll" with the name of your DLL file
-dll_path = "AirAPI_Windows.dll"
+# Load the DLL
+mydll = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
 
-# Load kernel32.dll
-kernel32 = windll.kernel32
+# Set the return type of the GetQuaternion function to a float pointer
+#mydll.GetQuaternion.restype = ctypes.POINTER(ctypes.c_float)
+mydll.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
 
-# Load your DLL using LoadLibrary from kernel32.dll
-dll_handle = kernel32.LoadLibraryA(dll_path.encode('utf-8'))
 
-if not dll_handle:
-    raise Exception("Failed to load DLL: {}".format(dll_path))
+# Call StartConnection
+print("Attempting to connect to AirAPI_Driver...")
+connection = mydll.StartConnection()
 
-# Get the GetQuaternion function address
-get_quaternion_func = ctypes.CFUNCTYPE(POINTER(c_float * 4))(("GetQuaternion", windll.kernel32))
+def getQuaternion():
+    # Call a function from the DLL
+    qtPtr = mydll.GetQuaternion()
+    quaternion = [qtPtr[i] for i in range(4)]
+    return quaternion
 
-# Call the GetQuaternion function
-quaternion_ptr = get_quaternion_func()
+def getRawGyro():
+    # Call a function from the DLL
+    gyroPtr = mydll.GetRawGyro()
+    rawGyro = [gyroPtr[i] for i in range(3)]
+    return rawGyro
 
-# Extract the array of 4 floats from the returned pointer
-quaternion = list(quaternion_ptr.contents)
+#rawGyro = mydll.GetRawGyro()
 
-print("Quaternion:", quaternion)
+# Convert the result pointer to an array of four floats
 
-def unload_dll():
-    print("Unloading DLL: {}".format(dll_path))
-    if not kernel32.FreeLibrary(dll_handle):
-        raise Exception("Failed to unload DLL: {}".format(dll_path))
 
-# Register the cleanup function to be called upon exit
-atexit.register(unload_dll)
+#rawGyroArr = [rawGyro[i] for i in range(3)]
+
+# Print the connection result
+print(connection)
+
+if(1 == 2):
+    print("Failed to StartConnection")
+else:
+    while True:
+        print("Printing Data")
+        test = getRawGyro()
+        print("Raw Gyro: ", test[0])
+        #print("Raw Gyro: ", rawGyroArr)
+        #wait 1 second
+        time.sleep(0.5)
+
+#print raw gyro
+#print(rawGyroArr)
