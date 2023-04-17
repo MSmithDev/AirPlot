@@ -3,6 +3,54 @@ import ctypes
 import numpy as np
 import pyqtgraph as pg
 
+#### Configure Refernece IMU ####
+import threading
+import serial
+
+# Open serial port on COM4 at a baud rate of 115200
+ser = serial.Serial('COM4', 115200)
+
+# Create a class to store sensor data
+class SensorData:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+        self.z = 0
+
+# Create instances of SensorData class
+ref_gyro = SensorData()
+ref_accel = SensorData()
+ref_mag = SensorData()
+
+# Define a function to read and process the serial data in a separate thread
+def read_serial_data():
+    while True:
+        #read line from serial port
+        line = ser.readline().decode('ascii' , errors='replace')
+        #split based on comma
+        line = line.split(',')
+        #Determine which sensor is sending data
+        match line[1]:
+            case '0':
+                ref_gyro.x = line[3]
+                ref_gyro.y = line[4]
+                ref_gyro.z = line[5]
+                #print(gyro.x, gyro.y, gyro.z)
+            case '1':
+                ref_accel.x = line[3]
+                ref_accel.y = line[4]
+                ref_accel.z = line[5]
+                #print(accel.x, accel.y, accel.z)
+            case '2':
+                ref_mag.x = line[3]
+                ref_mag.y = line[4]
+                ref_mag.z = line[5]
+                #print(mag.x, mag.y, mag.z)
+
+# Create and start the thread
+serial_thread = threading.Thread(target=read_serial_data)
+serial_thread.start()
+
 #### Configure DLL ####
 # Load the DLL
 mydll = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
@@ -47,55 +95,55 @@ def getGyroX():
 
 ## Reference data will be drawn red
 def getRefGyroX():
-    return 0
+    return ref_gyro.x
 
 def getGyroY():
     return rawGyroReading[1]
 
 def getRefGyroY():
-    return 0
+    return ref_gyro.y
 
 def getGyroZ():
     return rawGyroReading[2]
 
 def getRefGyroZ():
-    return 0
+    return ref_gyro.z
 
 def getAccelX():
     return rawAccelReading[0]
 
 def getRefAccelX():
-    return 0
+    return ref_accel.x
 
 def getAccelY():
     return rawAccelReading[1]
 
 def getRefAccelY():
-    return 0
+    return ref_accel.y
 
 def getAccelZ():
     return rawAccelReading[2]
 
 def getRefAccelZ():
-    return 0
+    return ref_accel.z
 
 def getMagX():
     return 0
 
 def getRefMagX():
-    return 0
+    return ref_mag.x
 
 def getMagY():
     return 0
 
 def getRefMagY():
-    return 0
+    return ref_mag.y
 
 def getMagZ():
     return 0
 
 def getRefMagZ():
-    return 0
+    return ref_mag.z
 
 def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, row=None, colspan=2):
     plot = window.addPlot(title=title, colspan=colspan, row=row)
@@ -160,7 +208,7 @@ magXRange = [-10,0]
 # Set Y range
 gyroYRange = [-120,120] #Min Max Degrees per second
 accelYRange = [-2,2] #Min Max G's
-magYRange = [-10,10] #Min Max Gauss
+magYRange = [-5,5] #Min Max Gauss
 
 
 updateGyroX = create_plot(win, "Gyro X", getGyroX, getRefGyroX, XRange=gyroXRange, YRange=gyroYRange)
