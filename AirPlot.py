@@ -8,7 +8,7 @@ import threading
 import serial
 
 # Open serial port on COM4 at a baud rate of 115200
-ser = serial.Serial('COM4', 115200)
+ser = serial.Serial('COM3', 115200)
 
 # Create a class to store sensor data
 class SensorData:
@@ -21,6 +21,7 @@ class SensorData:
 ref_gyro = SensorData()
 ref_accel = SensorData()
 ref_mag = SensorData()
+ref_euler = SensorData()
 
 # Define a function to read and process the serial data in a separate thread
 def read_serial_data():
@@ -29,23 +30,29 @@ def read_serial_data():
         line = ser.readline().decode('ascii' , errors='replace')
         #split based on comma
         line = line.split(',')
-        #Determine which sensor is sending data
-        match line[1]:
-            case '0':
-                ref_gyro.x = line[3]
-                ref_gyro.y = line[4]
-                ref_gyro.z = line[5]
-                #print(gyro.x, gyro.y, gyro.z)
-            case '1':
-                ref_accel.x = line[3]
-                ref_accel.y = line[4]
-                ref_accel.z = line[5]
-                #print(accel.x, accel.y, accel.z)
-            case '2':
-                ref_mag.x = line[3]
-                ref_mag.y = line[4]
-                ref_mag.z = line[5]
-                #print(mag.x, mag.y, mag.z)
+
+        if line[0] == '$PCHRA':
+            ref_euler.x = line[2] #roll
+            ref_euler.y = line[3] #pitch
+            ref_euler.z = line[4] #yaw
+        else:
+            #Determine which sensor is sending data
+            match line[1]:
+                case '0':
+                    ref_gyro.x = line[3]
+                    ref_gyro.y = line[4]
+                    ref_gyro.z = line[5]
+                    #print(gyro.x, gyro.y, gyro.z)
+                case '1':
+                    ref_accel.x = line[3]
+                    ref_accel.y = line[4]
+                    ref_accel.z = line[5]
+                    #print(accel.x, accel.y, accel.z)
+                case '2':
+                    ref_mag.x = line[3]
+                    ref_mag.y = line[4]
+                    ref_mag.z = line[5]
+                    #print(mag.x, mag.y, mag.z)
 
 # Create and start the thread
 serial_thread = threading.Thread(target=read_serial_data)
@@ -58,6 +65,7 @@ mydll = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
 # Set the return type of the GetQuaternion function to a float pointer
 mydll.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
 mydll.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
+mydll.GetEuler.restype = ctypes.POINTER(ctypes.c_float)
 
 # Call StartConnection
 print("Attempting to connect to AirAPI_Driver...")
@@ -75,17 +83,27 @@ def getRawAccel():
     rawAccel = [AccelPtr[i] for i in range(3)]
     return rawAccel
 
+def getEuler():
+    # Call a function from the DLL
+    eulerPtr = mydll.GetEuler()
+    euler = [eulerPtr[i] for i in range(3)]
+    return euler
+
 
 #### Configure Data sources ####
 rawGyroReading = [0,0,0]
 rawAccelReading = [0,0,0]
+
+eulerReading = [0,0,0]
 ##Air Data source
 def pollAirData():
     global rawGyroReading
     global rawAccelReading
+    global eulerReading
 
     rawGyroReading = getRawGyro()
     rawAccelReading = getRawAccel()
+    eulerReading = getEuler()
     return
 
 
@@ -145,6 +163,25 @@ def getMagZ():
 def getRefMagZ():
     return ref_mag.z
 
+def getEulerX():
+    return eulerReading[0]
+
+def getRefEulerX():
+    return ref_euler.x
+
+def getEulerY():
+    return eulerReading[1]
+
+def getRefEulerY():
+    return ref_euler.y
+
+def getEulerZ():
+    return eulerReading[2]
+
+def getRefEulerZ():
+    
+    return ref_euler.z
+
 def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, row=None, colspan=2):
     plot = window.addPlot(title=title, colspan=colspan, row=row)
     plot.setLabel('bottom', 'Time', 's')
@@ -193,7 +230,7 @@ def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, r
     return update
 
 
-win = pg.GraphicsLayoutWidget(show=True, size=(1400, 800))
+win = pg.GraphicsLayoutWidget(show=True, size=(1600, 800))
 win.setWindowTitle('AirPlot')
 
 chunkSize = 100
@@ -204,28 +241,39 @@ startTime = perf_counter()
 gyroXRange = [-10,0]
 accelXRange = [-10,0]
 magXRange = [-10,0]
+eularXRange = [-10,0]
+
 
 # Set Y range
 gyroYRange = [-120,120] #Min Max Degrees per second
 accelYRange = [-2,2] #Min Max G's
 magYRange = [-5,5] #Min Max Gauss
+eulerYRange = [-180,180] #Min Max Degrees
+
 
 
 updateGyroX = create_plot(win, "Gyro X", getGyroX, getRefGyroX, XRange=gyroXRange, YRange=gyroYRange)
 updateAccelX = create_plot(win, "Accel X", getAccelX, getRefAccelX, XRange=accelXRange, YRange=accelYRange)
 updateMagX = create_plot(win, "Mag X", getMagX,getRefMagX, XRange=magXRange, YRange=magYRange)
+updateEulerX = create_plot(win, "Euler X", getEulerX, getRefEulerX, XRange=eularXRange, YRange=eulerYRange)
 
 win.nextRow()
 
 updateGyroY = create_plot(win, "Gyro Y", getGyroY, getRefGyroY, XRange=gyroXRange, YRange=gyroYRange)
 updateAccelY = create_plot(win, "Accel Y", getAccelY, getRefAccelY, XRange=accelXRange, YRange=accelYRange)
 updateMagY = create_plot(win, "Mag Y", getMagY,getRefMagY, XRange=magXRange, YRange=magYRange)
+updateEulerY = create_plot(win, "Euler Y", getEulerY, getRefEulerY, XRange=eularXRange, YRange=eulerYRange)
 
 win.nextRow()
 
 updateGyroZ = create_plot(win, "Gyro Z", getGyroZ, getRefGyroZ, XRange=gyroXRange, YRange=gyroYRange)
 updateAccelZ = create_plot(win, "Accel Z", getAccelZ, getRefAccelZ, XRange=accelXRange, YRange=accelYRange)
 updateMagZ = create_plot(win, "Mag Z", getMagZ, getRefMagZ,XRange=magXRange, YRange=magYRange)
+updateEulerZ = create_plot(win, "Euler Z", getEulerZ, getRefEulerZ, XRange=eularXRange, YRange=eulerYRange)
+
+win.nextRow()
+
+
 
 
 def update():
@@ -234,14 +282,18 @@ def update():
     updateGyroX()
     updateAccelX()
     updateMagX()
+    updateEulerX()
 
     updateGyroY()
     updateAccelY()
     updateMagY()
+    updateEulerY()
 
     updateGyroZ()
     updateAccelZ()
     updateMagZ()
+    updateEulerZ()
+    
 
 
 timer = pg.QtCore.QTimer()
