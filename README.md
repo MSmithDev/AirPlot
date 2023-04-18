@@ -19,7 +19,7 @@ If you are not using a reference IMU change this to false
 ##Use Reference IMU?
 useRefImu = True
 ```
-If you are using different reference IMU you can modify the def returns to suit your needs.
+If you are using a different reference IMU you can modify the def returns to suit your needs.
 ```python
 ## Air data will be drawn grey
 def getGyroX():
