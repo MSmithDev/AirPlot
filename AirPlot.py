@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 
 ##Use Reference IMU?
-useRefImu = True
+useRefImu = False
 
 #Class to store sensor data
 class SensorData:
@@ -71,6 +71,10 @@ AirAPI = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
 AirAPI.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
 AirAPI.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
 AirAPI.GetEuler.restype = ctypes.POINTER(ctypes.c_float)
+AirAPI.GetRawMag.restype = ctypes.POINTER(ctypes.c_float)
+
+#set the return type of getTimestamp to int64
+#AirAPI.GetAirTimestamp.restype = ctypes.c_uint64()
 
 # Call StartConnection
 print("Attempting to connect to AirAPI_Driver...")
@@ -87,6 +91,12 @@ def getRawAccel():
     AccelPtr = AirAPI.GetRawAccel()
     rawAccel = [AccelPtr[i] for i in range(3)]
     return rawAccel
+
+def getRawMag():
+    # Call GetRawMag function from the DLL
+    magPtr = AirAPI.GetRawMag()
+    rawMag = [magPtr[i] for i in range(3)]
+    return rawMag
 
 def getEuler():
     # Call GetEuler function from the DLL
@@ -110,6 +120,7 @@ def pollAirData():
     rawGyroReading = getRawGyro()
     rawAccelReading = getRawAccel()
     eulerReading = getEuler()
+    rawMagReading = getRawMag()
     return
 
 
@@ -152,19 +163,19 @@ def getRefAccelZ():
     return ref_accel.z
 
 def getMagX():
-    return 0
+    return rawMagReading[0]
 
 def getRefMagX():
     return ref_mag.x
 
 def getMagY():
-    return 0
+    return rawMagReading[1]
 
 def getRefMagY():
     return ref_mag.y
 
 def getMagZ():
-    return 0
+    return rawMagReading[2]
 
 def getRefMagZ():
     return ref_mag.z
@@ -187,6 +198,12 @@ def getEulerZ():
 def getRefEulerZ():
     
     return ref_euler.z
+
+def getTimestamp():
+    ts = AirAPI.GetAirTimestamp()
+    print(ts)
+    return ts
+
 
 def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, row=None, colspan=2):
     plot = window.addPlot(title=title, colspan=colspan, row=row)
@@ -278,7 +295,7 @@ updateMagZ = create_plot(win, "Mag Z", getMagZ, getRefMagZ,XRange=magXRange, YRa
 updateEulerZ = create_plot(win, "Euler Z", getEulerZ, getRefEulerZ, XRange=eularXRange, YRange=eulerYRange)
 
 win.nextRow()
-
+updateTimestamp = create_plot(win, "Timestamp", getTimestamp, XRange=[-10,0], YRange=[0,1000], colspan=4)
 
 
 
@@ -300,6 +317,7 @@ def update():
     updateMagZ()
     updateEulerZ()
     
+    updateTimestamp()
 
 
 timer = pg.QtCore.QTimer()
