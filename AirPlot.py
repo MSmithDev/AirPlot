@@ -3,89 +3,94 @@ import ctypes
 import numpy as np
 import pyqtgraph as pg
 
-#### Configure Refernece IMU ####
-import threading
-import serial
+##Use Reference IMU?
+useRefImu = True
 
-# Open serial port on COM4 at a baud rate of 115200
-ser = serial.Serial('COM3', 115200)
-
-# Create a class to store sensor data
+#Class to store sensor data
 class SensorData:
     def __init__(self):
         self.x = 0
         self.y = 0
         self.z = 0
-
+            
 # Create instances of SensorData class
 ref_gyro = SensorData()
 ref_accel = SensorData()
 ref_mag = SensorData()
 ref_euler = SensorData()
 
-# Define a function to read and process the serial data in a separate thread
-def read_serial_data():
-    while True:
-        #read line from serial port
-        line = ser.readline().decode('ascii' , errors='replace')
-        #split based on comma
-        line = line.split(',')
+if useRefImu:
+    #### Configure Reference IMU ####
+    import threading
+    import serial
 
-        if line[0] == '$PCHRA':
-            ref_euler.x = line[2] #roll
-            ref_euler.y = line[3] #pitch
-            ref_euler.z = line[4] #yaw
-        else:
-            #Determine which sensor is sending data
-            match line[1]:
-                case '0':
-                    ref_gyro.x = line[3]
-                    ref_gyro.y = line[4]
-                    ref_gyro.z = line[5]
-                    #print(gyro.x, gyro.y, gyro.z)
-                case '1':
-                    ref_accel.x = line[3]
-                    ref_accel.y = line[4]
-                    ref_accel.z = line[5]
-                    #print(accel.x, accel.y, accel.z)
-                case '2':
-                    ref_mag.x = line[3]
-                    ref_mag.y = line[4]
-                    ref_mag.z = line[5]
-                    #print(mag.x, mag.y, mag.z)
+    # Open serial port on COM# at a baud rate of 115200
+    ser = serial.Serial('COM3', 115200)
 
-# Create and start the thread
-serial_thread = threading.Thread(target=read_serial_data)
-serial_thread.start()
+
+    def read_serial_data():
+        while True:
+            #read line from serial port
+            line = ser.readline().decode('ascii' , errors='replace')
+            #split based on comma
+            line = line.split(',')
+
+            if line[0] == '$PCHRA':
+                ref_euler.x = line[2] #roll
+                ref_euler.y = line[3] #pitch
+                ref_euler.z = line[4] #yaw
+            else:
+                #Determine which sensor is sending data
+                match line[1]:
+                    case '0':
+                        ref_gyro.x = line[3]
+                        ref_gyro.y = line[4]
+                        ref_gyro.z = line[5]
+                        #print(gyro.x, gyro.y, gyro.z)
+                    case '1':
+                        ref_accel.x = line[3]
+                        ref_accel.y = line[4]
+                        ref_accel.z = line[5]
+                        #print(accel.x, accel.y, accel.z)
+                    case '2':
+                        ref_mag.x = line[3]
+                        ref_mag.y = line[4]
+                        ref_mag.z = line[5]
+                        #print(mag.x, mag.y, mag.z)
+
+    # Create and start the thread
+    serial_thread = threading.Thread(target=read_serial_data)
+    serial_thread.start()
 
 #### Configure DLL ####
+
 # Load the DLL
-mydll = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
+AirAPI = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
 
 # Set the return type of the GetQuaternion function to a float pointer
-mydll.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
-mydll.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
-mydll.GetEuler.restype = ctypes.POINTER(ctypes.c_float)
+AirAPI.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
+AirAPI.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
+AirAPI.GetEuler.restype = ctypes.POINTER(ctypes.c_float)
 
 # Call StartConnection
 print("Attempting to connect to AirAPI_Driver...")
-connection = mydll.StartConnection()
+connection = AirAPI.StartConnection()
 
 def getRawGyro():
-    # Call a function from the DLL
-    gyroPtr = mydll.GetRawGyro()
+    # Call GetRawGyro function from the DLL
+    gyroPtr = AirAPI.GetRawGyro()
     rawGyro = [gyroPtr[i] for i in range(3)]
     return rawGyro
 
 def getRawAccel():
-    # Call a function from the DLL
-    AccelPtr = mydll.GetRawAccel()
+    # Call GetRawAccel function from the DLL
+    AccelPtr = AirAPI.GetRawAccel()
     rawAccel = [AccelPtr[i] for i in range(3)]
     return rawAccel
 
 def getEuler():
-    # Call a function from the DLL
-    eulerPtr = mydll.GetEuler()
+    # Call GetEuler function from the DLL
+    eulerPtr = AirAPI.GetEuler()
     euler = [eulerPtr[i] for i in range(3)]
     return euler
 
@@ -93,6 +98,7 @@ def getEuler():
 #### Configure Data sources ####
 rawGyroReading = [0,0,0]
 rawAccelReading = [0,0,0]
+rawMagReading = [0,0,0]
 
 eulerReading = [0,0,0]
 ##Air Data source
