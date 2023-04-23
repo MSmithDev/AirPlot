@@ -119,6 +119,7 @@ rawAccelReading = [0,0,0]
 rawMagReading = [0,0,0]
 
 eulerReading = [0,0,0]
+rejectionCounters = [0,0]
 ##Air Data source
 def pollAirData():
     global rawGyroReading
