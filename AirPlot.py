@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 
 ##Use Reference IMU?
-useRefImu = True
+useRefImu = False
 
 #Class to store sensor data
 class SensorData:
@@ -71,6 +71,13 @@ AirAPI = ctypes.cdll.LoadLibrary("./DevDLL/AirAPI_Windows.dll")
 AirAPI.GetRawGyro.restype = ctypes.POINTER(ctypes.c_float)
 AirAPI.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
 AirAPI.GetEuler.restype = ctypes.POINTER(ctypes.c_float)
+AirAPI.GetRawMag.restype = ctypes.POINTER(ctypes.c_float)
+
+AirAPI.GetRejectionCounters.restype = ctypes.POINTER(ctypes.c_int64)
+
+#set return type of GetAirTimestamp to uint64
+AirAPI.GetAirTimestamp.restype = ctypes.c_uint64
+
 
 # Call StartConnection
 print("Attempting to connect to AirAPI_Driver...")
@@ -88,12 +95,23 @@ def getRawAccel():
     rawAccel = [AccelPtr[i] for i in range(3)]
     return rawAccel
 
+def getRawMag():
+    # Call GetRawMag function from the DLL
+    magPtr = AirAPI.GetRawMag()
+    rawMag = [magPtr[i] for i in range(3)]
+    return rawMag
+
 def getEuler():
     # Call GetEuler function from the DLL
     eulerPtr = AirAPI.GetEuler()
     euler = [eulerPtr[i] for i in range(3)]
     return euler
 
+def getRejectionCounters():
+    # Call GetRejectionCounters function from the DLL
+    rejectionCountersPtr = AirAPI.GetRejectionCounters()
+    rejectionCounters = [rejectionCountersPtr[i] for i in range(2)]
+    return rejectionCounters
 
 #### Configure Data sources ####
 rawGyroReading = [0,0,0]
@@ -106,10 +124,14 @@ def pollAirData():
     global rawGyroReading
     global rawAccelReading
     global eulerReading
+    global rejectionCounters
 
     rawGyroReading = getRawGyro()
     rawAccelReading = getRawAccel()
     eulerReading = getEuler()
+    rawMagReading = getRawMag()
+    rejectionCounters = getRejectionCounters()
+
     return
 
 
@@ -152,19 +174,19 @@ def getRefAccelZ():
     return ref_accel.z
 
 def getMagX():
-    return 0
+    return rawMagReading[0]
 
 def getRefMagX():
     return ref_mag.x
 
 def getMagY():
-    return 0
+    return rawMagReading[1]
 
 def getRefMagY():
     return ref_mag.y
 
 def getMagZ():
-    return 0
+    return rawMagReading[2]
 
 def getRefMagZ():
     return ref_mag.z
@@ -187,6 +209,19 @@ def getEulerZ():
 def getRefEulerZ():
     
     return ref_euler.z
+
+def getTimestamp():
+    # Call GetAirTimestamp function from the DLL and convert nanoseconds to seconds
+    ts = AirAPI.GetAirTimestamp() / 1000000000
+    return ts
+
+def getAccelRejectCounter():
+    return rejectionCounters[0]
+
+def getMagRejectCounter():
+    return rejectionCounters[1]
+
+
 
 def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, row=None, colspan=2):
     plot = window.addPlot(title=title, colspan=colspan, row=row)
@@ -278,7 +313,9 @@ updateMagZ = create_plot(win, "Mag Z", getMagZ, getRefMagZ,XRange=magXRange, YRa
 updateEulerZ = create_plot(win, "Euler Z", getEulerZ, getRefEulerZ, XRange=eularXRange, YRange=eulerYRange)
 
 win.nextRow()
-
+updateTimestamp = create_plot(win, "Timestamp", getTimestamp, XRange=[-10,0], YRange=None, colspan=2)
+updateAccelRejectCounter = create_plot(win, "Accel Reject Counter", getAccelRejectCounter, XRange=[-10,0], YRange=None, colspan=2)
+updateMagRejectCounter = create_plot(win, "Mag Reject Counter", getMagRejectCounter, XRange=[-10,0], YRange=None, colspan=2)
 
 
 
@@ -300,6 +337,9 @@ def update():
     updateMagZ()
     updateEulerZ()
     
+    updateTimestamp()
+    updateAccelRejectCounter()
+    updateMagRejectCounter()
 
 
 timer = pg.QtCore.QTimer()
