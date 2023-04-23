@@ -73,8 +73,11 @@ AirAPI.GetRawAccel.restype = ctypes.POINTER(ctypes.c_float)
 AirAPI.GetEuler.restype = ctypes.POINTER(ctypes.c_float)
 AirAPI.GetRawMag.restype = ctypes.POINTER(ctypes.c_float)
 
-#set the return type of getTimestamp to int64
-#AirAPI.GetAirTimestamp.restype = ctypes.c_uint64()
+AirAPI.GetRejectionCounters.restype = ctypes.POINTER(ctypes.c_int64)
+
+#set return type of GetAirTimestamp to uint64
+AirAPI.GetAirTimestamp.restype = ctypes.c_uint64
+
 
 # Call StartConnection
 print("Attempting to connect to AirAPI_Driver...")
@@ -104,6 +107,11 @@ def getEuler():
     euler = [eulerPtr[i] for i in range(3)]
     return euler
 
+def getRejectionCounters():
+    # Call GetRejectionCounters function from the DLL
+    rejectionCountersPtr = AirAPI.GetRejectionCounters()
+    rejectionCounters = [rejectionCountersPtr[i] for i in range(2)]
+    return rejectionCounters
 
 #### Configure Data sources ####
 rawGyroReading = [0,0,0]
@@ -116,11 +124,14 @@ def pollAirData():
     global rawGyroReading
     global rawAccelReading
     global eulerReading
+    global rejectionCounters
 
     rawGyroReading = getRawGyro()
     rawAccelReading = getRawAccel()
     eulerReading = getEuler()
     rawMagReading = getRawMag()
+    rejectionCounters = getRejectionCounters()
+
     return
 
 
@@ -200,9 +211,16 @@ def getRefEulerZ():
     return ref_euler.z
 
 def getTimestamp():
-    ts = AirAPI.GetAirTimestamp()
-    print(ts)
+    # Call GetAirTimestamp function from the DLL and convert nanoseconds to seconds
+    ts = AirAPI.GetAirTimestamp() / 1000000000
     return ts
+
+def getAccelRejectCounter():
+    return rejectionCounters[0]
+
+def getMagRejectCounter():
+    return rejectionCounters[1]
+
 
 
 def create_plot(window, title,source, ref_source=None,XRange=None,YRange=None, row=None, colspan=2):
@@ -295,7 +313,9 @@ updateMagZ = create_plot(win, "Mag Z", getMagZ, getRefMagZ,XRange=magXRange, YRa
 updateEulerZ = create_plot(win, "Euler Z", getEulerZ, getRefEulerZ, XRange=eularXRange, YRange=eulerYRange)
 
 win.nextRow()
-updateTimestamp = create_plot(win, "Timestamp", getTimestamp, XRange=[-10,0], YRange=[0,1000], colspan=4)
+updateTimestamp = create_plot(win, "Timestamp", getTimestamp, XRange=[-10,0], YRange=None, colspan=2)
+updateAccelRejectCounter = create_plot(win, "Accel Reject Counter", getAccelRejectCounter, XRange=[-10,0], YRange=None, colspan=2)
+updateMagRejectCounter = create_plot(win, "Mag Reject Counter", getMagRejectCounter, XRange=[-10,0], YRange=None, colspan=2)
 
 
 
@@ -318,6 +338,8 @@ def update():
     updateEulerZ()
     
     updateTimestamp()
+    updateAccelRejectCounter()
+    updateMagRejectCounter()
 
 
 timer = pg.QtCore.QTimer()
